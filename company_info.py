@@ -270,7 +270,8 @@ def query_infos(company_name):
     if get_companys:
         company_infos = get_companys[0]
         company_id = company_infos.get('公司ID')
-        if company_id:
+        company_zt = company_infos.get('登记状态')
+        if company_zt in ['存续','正常','开业']:
             get_company_icps = get_company_icp(company_id)
             company_icps ={
 
