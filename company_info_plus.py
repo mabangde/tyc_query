@@ -4,8 +4,7 @@ import chardet
 import atexit
 import csv
 import os
-import random
-import tqdm
+import re
 import datetime
 import json
 import time
@@ -41,11 +40,34 @@ def get_timesmap():
     timestamp_str = str(timestamp)
     return timestamp_str
 
-## 股权控制参数 ，float数据类型，全局配置
-# investment_threshold=51.0 未能实现,废弃
+# Global equity control parameters, float data type
+# investment_threshold = 51.0 (Deprecated)
 
-## 筛选股东企业（上游投资企业）
-shareholder_group = '国家电网有限公司'
+# Filtering Shareholder Companies (Upstream Investment Companies)
+shareholder_group = '国家电网有限公司'  # 控制要包含的股东（投资）公司
+control_threshold = float(51.0)  # 控制最小投资占股
+
+# 匹配符合股权条件的公司
+def filter_equity(text):
+    # Define a regular expression pattern to match investment percentages
+    pattern = r'\[投资([\d\.]+)%\]'
+
+    # Use regular expressions to find all investment percentages
+    percentages = re.findall(pattern, text)
+
+    # Convert percentages to float numbers
+    num_list = [float(num) for num in percentages]
+
+    # Check if the equity chain contains the specified shareholder group
+    if shareholder_group in text:
+        # Check if all investment percentages are greater than or equal to the control threshold
+        if all(p >= control_threshold for p in num_list):
+            return text
+
+    return None
+
+
+
 
 def load_token():
     try:
@@ -309,7 +331,8 @@ def query_infos(company_name):
                 '股权穿透信息':equitys
             }
 
-            if shareholder_group in equitys:
+
+            if filter_equity(equitys):
                 combined_info = {**company_infos, **company_icps, **path}
                 print('=' * 50)
                 for key, value in combined_info.items():
@@ -323,7 +346,6 @@ def query_infos(company_name):
                     writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
                     if csv_file.tell() == 0:
                         writer.writeheader()
-
                     writer.writerow(combined_info)
 
 def main(args):
