@@ -95,7 +95,7 @@ def http_request(url, method='GET', data=None, headers=None, params=None, max_re
 
             else:
                 response_json = {} 
-        except session.exceptions.Timeout:
+        except requests.exceptions.Timeout:
             print("请求超时")
 
         if 'mustlogin' in response_json.get('message', ''):
