@@ -1,7 +1,9 @@
 import requests
 import argparse
 import chardet
+import atexit
 import csv
+import os
 import random
 import tqdm
 import datetime
@@ -10,6 +12,21 @@ import time
 from urllib.parse import urlparse
 import urllib3
 urllib3.disable_warnings()
+
+
+# Define a variable to keep track of the last successfully processed query
+def save_checkpoint(file_name, total_queries, current_index):
+    # 保存检查点信息到文件
+    with open("checkpoint.txt", "w") as checkpoint_file:
+        checkpoint_file.write(f"{file_name}\n{total_queries}\n{current_index}")
+
+def load_checkpoint():
+    # 从检查点文件加载检查点信息
+    checkpoint_info = []
+    if os.path.exists("checkpoint.txt"):
+        with open("checkpoint.txt", "r") as checkpoint_file:
+            checkpoint_info = checkpoint_file.read().splitlines()
+    return checkpoint_info
 
 
 ## url 请求函数
@@ -101,7 +118,7 @@ def http_request(url, method='GET', data=None, headers=None, params=None, max_re
 
             else:
                 response_json = {} 
-        except session.exceptions.Timeout:
+        except requests.exceptions.Timeout:
             print("请求超时")
 
         if 'mustlogin' in response_json.get('message', ''):
@@ -311,25 +328,39 @@ def query_infos(company_name):
 
 def main(args):
     if args.query:
-        company_name  = args.query
-        print('[i] 正在查询: ' , company_name ,"企业信息...")
+        # 单个查询模式
+        company_name = args.query
+        print('[i] 正在查询: ', company_name, "企业信息...")
         query_infos(company_name)
-            
-        
+
     elif args.file:
-        # Batch query mode
+        # 批量查询模式
         with open(args.file, 'rb') as f:
             result = chardet.detect(f.read())
 
-        # 使用检测到的编码打开文件
         with open(args.file, 'r', encoding=result['encoding']) as file:
             query_strings = file.read().splitlines()
-        
-        total_queries = len(query_strings)
 
-        for index, query_string in enumerate(query_strings, start=1):
-            print(f'[i] 正在查询 ({index}/{total_queries}): {query_string} 企业信息...')
+        total_queries = len(query_strings)
+        
+        # 从检查点加载上次的查询状态
+        checkpoint_info = load_checkpoint()
+        if checkpoint_info:
+            file_name, total_queries, current_index = checkpoint_info
+            total_queries = int(total_queries)  # 将字符串转换为整数
+            current_index = int(current_index)    # 将字符串转换为整数
+            print(f'[i] 上次查询文件: {file_name}, 总查询数: {total_queries}, 当前索引: {current_index}')
+        else:
+            file_name = args.file
+            current_index = 0
+
+        for index in range(current_index, total_queries):
+            query_string = query_strings[index]
+            print(f'[i] 正在查询 ({index + 1}/{total_queries}): {query_string} 企业信息...')
             query_infos(query_string)
+            
+            # 更新检查点信息
+            save_checkpoint(file_name, total_queries, index + 1)
      
 
 if __name__ == "__main__":
