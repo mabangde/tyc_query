@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 import urllib3
 urllib3.disable_warnings()
 
-## 带筛选股权及股东版本
+
 ## url 请求函数
 
 proxies = {
@@ -25,9 +25,9 @@ def get_timesmap():
     return timestamp_str
 
 ## 股权控制参数 ，float数据类型，全局配置
-investment_threshold=51.0
+# investment_threshold=51.0 未能实现,废弃
 
-## 股东企业（上游投资企业）
+## 筛选股东企业（上游投资企业）
 shareholder_group = '国家电网有限公司'
 
 def load_token():
@@ -256,21 +256,19 @@ def equity_analysis(cid):
         formatted_paths = []
         for path in paths:
             if path['textType'] == 'rightArrow':
-                investment_text = f"[{path['text']}]"
-                if '%' in investment_text:
-                    investment_percentage = float(path['text'].replace("投资", "").replace("%", "").strip())
-                    if investment_percentage >= investment_threshold:
-                        formatted_paths.append(investment_text)
+                formatted_paths.append('['+path['text']+']')
             if path['textType'] == 'entity':
                 formatted_paths.append(path['text'])
 
         # 将格式化后的路径以 "->" 连接并打印
         path_format = "->".join(formatted_paths)
-        return company_name, path_format
-    else:
-        company_name = "-"
+        return path_format
+    else: 
+        #company_name = "-"
         path_format = "-"
-        return company_name, path_format
+        return path_format
+
+
 
 ## 所有信息查询入口
 def query_infos(company_name):
@@ -287,13 +285,14 @@ def query_infos(company_name):
                 '企业备案' :get_company_icps
             }
             # 控制股权参数float 类型
-            
+            #print(equitys)
             equitys = equity_analysis(company_id)
+            #print(equitys)
             path = {
-                '股权穿透信息':equitys[1]
+                '股权穿透信息':equitys
             }
 
-            if shareholder_group in equitys[1]:
+            if shareholder_group in equitys:
                 combined_info = {**company_infos, **company_icps, **path}
                 print('=' * 50)
                 for key, value in combined_info.items():
