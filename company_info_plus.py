@@ -12,8 +12,9 @@ from urllib.parse import urlparse
 import urllib3
 urllib3.disable_warnings()
 
+shareholder_group = 'xxxx有限公司'  # 控制要包含的股东（投资）公司
+control_threshold = float(51.0)  # 控制最小投资占股
 
-# Define a variable to keep track of the last successfully processed query
 def save_checkpoint(file_name, total_queries, current_index):
     # 保存检查点信息到文件
     with open("checkpoint.txt", "w") as checkpoint_file:
@@ -27,9 +28,6 @@ def load_checkpoint():
             checkpoint_info = checkpoint_file.read().splitlines()
     return checkpoint_info
 
-
-## url 请求函数
-
 proxies = {
     "http": "http://127.0.0.1:8080",
     "https": "http://127.0.0.1:8080",
@@ -41,11 +39,7 @@ def get_timesmap():
     return timestamp_str
 
 # Global equity control parameters, float data type
-# investment_threshold = 51.0 (Deprecated)
 
-# Filtering Shareholder Companies (Upstream Investment Companies)
-shareholder_group = '国家电网有限公司'  # 控制要包含的股东（投资）公司
-control_threshold = float(51.0)  # 控制最小投资占股
 
 # 匹配符合股权条件的公司
 def filter_equity(text):
@@ -65,8 +59,6 @@ def filter_equity(text):
             return text
 
     return None
-
-
 
 
 def load_token():
