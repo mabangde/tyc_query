@@ -19,12 +19,12 @@ from configparser import ConfigParser
 requests.packages.urllib3.disable_warnings()
 import urllib
 import os
+
 proxies = {
     'http': 'http://127.0.0.1:8081',
     'https': 'http://127.0.0.1:8081'
 }
 
-x_auth_token = 'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMzUwMTE3OTYzNiIsImlhdCI6MTY5ODY1ODA0NywiZXhwIjoxNzAxMjUwMDQ3fQ.8hBts2BQyV6AAgOAq1CbaHGo61z_voXF-1SEwge4RL2b4xKOnT5DBZicddHpC0jVz5Bw-bSRapGmLntfz6pW-A'
 
 
 
@@ -40,13 +40,14 @@ def get_timesmap():
     timestamp_str = str(timestamp)
     return timestamp_str
 
+
 timestamp_str = get_timesmap()
 
 
 ## 通过企业名查企业ID
 def get_company_info(name):
-    #print(f'[i] 通过企业名称：{name},查询企业ID')
-    
+    # print(f'[i] 通过企业名称：{name},查询企业ID')
+
     company_url = f'https://capi.tianyancha.com/cloud-tempest/web/searchCompanyV3?_={timestamp_str}'
     data = '{"word":"' + str(name) + '","sortType":"1","pageSize":0,"referer":"search","pageNum":0}'
     response = http_request(company_url, method='POST', data=data)
@@ -63,7 +64,7 @@ def get_company_info(name):
                         company_info['公司ID'] = compay['id']
                         company_info['公司名称'] = company_name
                         company_info['注册资本'] = compay['regCapital']
-                        company_info['成立日期'] = compay['estiblishTime'].replace(' 00:00:00.0','')
+                        company_info['成立日期'] = compay['estiblishTime'].replace(' 00:00:00.0', '')
 
                         # 处理websites字段，保持与之前的方式一致
                         site = str(compay['websites']).split('\t')
@@ -78,7 +79,6 @@ def get_company_info(name):
                         return [company_info]  # 返回第一个匹配的字典数据
 
         return []  # 如果没有匹配的数据，则返回空列表
-
 
 
 ## 查询下属子公司及投资情况
@@ -97,7 +97,6 @@ def get_child_companies(id):
     "percentLevel":"5"  %90 以上
     "percentLevel":"6"  100% 
     '''
-   
 
     while True:
         data = {
@@ -115,7 +114,7 @@ def get_child_companies(id):
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
-            "X-AUTH-TOKEN": x_auth_token
+            "X-AUTH-TOKEN": load_token()
         }
 
         response = http_request(company_url, method='POST', json_data=data, headers=headers)
@@ -145,13 +144,13 @@ def get_child_companies(id):
     return id_list
 
 
-
 def input_and_save_token():
     print("[-] Token 文件未找到或已失效，请输入新的 Token.")
     new_token = input("新的 X-AUTH-TOKEN 值: ").strip()
     with open('token.txt', 'w') as file:
         file.write(new_token)
     return new_token
+
 
 def load_token():
     try:
@@ -162,6 +161,7 @@ def load_token():
             return loaded_token
     except FileNotFoundError:
         return input_and_save_token()
+
 
 def http_request(url, method='GET', data=None, json_data=None, headers=None, params=None, max_retries=2):
     session = requests.Session()
@@ -202,15 +202,18 @@ def http_request(url, method='GET', data=None, json_data=None, headers=None, par
     base_headers["X-AUTH-TOKEN"] = load_token()
     time.sleep(1)
     timeout = (30, 30)
-    
+
     for retry_attempt in range(1, max_retries + 1):
         if method == 'GET':
-            response = session.get(url, params=params, headers=base_headers, proxies=proxies, verify=False,timeout=timeout)
+            response = session.get(url, params=params, headers=base_headers, proxies=proxies, verify=False,
+                                   timeout=timeout)
         elif method == 'POST':
             if json_data is not None:
-                response = session.post(url, json=json_data, headers=base_headers, params=params, proxies=proxies, verify=False,timeout=timeout)
+                response = session.post(url, json=json_data, headers=base_headers, params=params, proxies=proxies,
+                                        verify=False, timeout=timeout)
             else:
-                response = session.post(url, data=data.encode('utf-8'), headers=base_headers, params=params, proxies=proxies, verify=False,timeout=timeout)
+                response = session.post(url, data=data.encode('utf-8'), headers=base_headers, params=params,
+                                        proxies=proxies, verify=False, timeout=timeout)
         else:
             raise ValueError("不支持的 HTTP 方法")
 
@@ -218,29 +221,34 @@ def http_request(url, method='GET', data=None, json_data=None, headers=None, par
             if response:
                 response_json = response.json()
             else:
-                response_json = {} 
+                response_json = {}
         except session.exceptions.Timeout:
             print("请求超时")
+
+        if '请登录以使用完整功能' in response_json.get('message', ''):
+
+            if mustlogin_count == 0:
+                # 第一次出现'mustlogin'表示token无效，需要重新输入
+                input_and_save_token()
+                mustlogin_count += 1
 
         if 'mustlogin' in response_json.get('message', ''):
             if mustlogin_count == 0:
                 # 第一次出现'mustlogin'表示token无效，需要重新输入
                 input_and_save_token()
                 mustlogin_count += 1
-        if '请稍后重试' not in response_json.get('message', ''):
-            return response
-
-        print('[-] message:', response_json.get('message', ''))
-        print('正在:第', retry_attempt, "次重试..")
-        if retry_attempt < max_retries:
-            print("正在等待 40 秒后重试...")
-            time.sleep(40)
-        else:
-            print("已达到最大重试次数，停止重试。")
-            return None
+        #if "state":"error",
+        if 'error' in response_json.get('state', ''):
+            print('[-] message:', response_json.get('message', ''))
+            print('正在:第', retry_attempt, "次重试..")
+            if retry_attempt < max_retries:
+                print("正在等待 40 秒后重试...")
+                time.sleep(40)
+            else:
+                print("已达到最大重试次数，停止重试。")
+                return None
 
     return response
- 
 
 
 def get_company_chain(company_id, current_chain=None):
@@ -272,12 +280,24 @@ def get_company_chain(company_id, current_chain=None):
 
     return company_chains
 
+
 if __name__ == '__main__':
-    
-    # 指定公司名称，开始获取子公司信息和关系链条
-    company_name = "谷歌公司"  # 请替换为实际的公司名称
-    #all_subcompany_chains = get_company_chain(company_name)
-    company_info =get_company_info(company_name)
-    company_id = int(company_info[0]['公司ID'])
-    get_company_chain(company_id)
- 
+    # 从文件中读取公司名称列表
+    file_path = "company_names.txt"  # 请替换为实际的文件路径
+    with open(file_path, 'r', encoding='utf-8-sig') as file:
+        company_names = file.readlines()
+
+    for company_name in company_names:
+        company_name = company_name.strip()  # 去除行末尾的换行符和空格
+
+        # 获取公司信息
+        company_info = get_company_info(company_name)
+        #print(company_info)
+        if company_info:
+            company_id = int(company_info[0]['公司ID'])
+            get_company_chain(company_id)
+        #print(company_id)
+
+
+        # 获取公司关系链条
+
