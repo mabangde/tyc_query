@@ -1,5 +1,5 @@
 # author:Wolvez
-# time:2023/10/31
+# time:2023/11/13
 import random
 import traceback
 import requests
@@ -200,7 +200,7 @@ def http_request(url, method='GET', data=None, json_data=None, headers=None, par
 
     # Update the X-AUTH-TOKEN header here if needed
     base_headers["X-AUTH-TOKEN"] = load_token()
-    time.sleep(1)
+    time.sleep(3)
     timeout = (30, 30)
 
     for retry_attempt in range(1, max_retries + 1):
@@ -242,8 +242,8 @@ def http_request(url, method='GET', data=None, json_data=None, headers=None, par
             print('[-] message:', response_json.get('message', ''))
             print('正在:第', retry_attempt, "次重试..")
             if retry_attempt < max_retries:
-                print("正在等待 40 秒后重试...")
-                time.sleep(40)
+                print("正在等待 3 秒后重试...")
+                time.sleep(3)
             else:
                 print("已达到最大重试次数，停止重试。")
                 return None
@@ -263,7 +263,10 @@ def get_company_chain(company_id, current_chain=None):
     for child_company in child_companies:
         child_company_name = child_company['name']
         child_company_id = child_company['id']
+        child_company_status = child_company['regStatus']
         investment_percent = child_company['percent']
+        if child_company_status in ['注销', '吊销']:
+            continue
         chain_description = f"{child_company_name} (投资比例: {investment_percent})"
 
         child_company_chain = current_chain + [chain_description]  # 构建子公司的关系链
@@ -292,10 +295,16 @@ if __name__ == '__main__':
 
         # 获取公司信息
         company_info = get_company_info(company_name)
+        print("\n正在查询：")
+        print(company_name)
+        print('#'* 40)
         #print(company_info)
         if company_info:
-            company_id = int(company_info[0]['公司ID'])
-            get_company_chain(company_id)
+            company_regStatus = company_info[0]['登记状态']
+            #print(company_regStatus)
+            if company_regStatus !='注销':
+                company_id = int(company_info[0]['公司ID'])
+                get_company_chain(company_id)
         #print(company_id)
 
 
